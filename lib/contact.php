@@ -819,6 +819,13 @@ class Contact extends VObject\VCard implements IPIMObject {
 			$vEvent->{'RRULE'} = 'FREQ=YEARLY';
 			$vEvent->{'SUMMARY'} = $title . ' (' . $date->format('Y') . ')';
 			$vEvent->{'TRANSP'} = 'TRANSPARENT';
+
+			$alarm = $vCal->createComponent('VALARM');
+			$alarm->{'TRIGGER'} = '-PT0H';
+			$alarm->add($vCal->createProperty('TRIGGER', '-PT0M', ['VALUE' => 'DURATION']));
+			$alarm->add($vCal->createProperty('DESCRIPTION', $title . ' (' . $date->format('Y') . ')'));
+			$vEvent->add($alarm);
+
 			$appInfo = \OCP\App::getAppInfo('contacts');
 			$appVersion = \OCP\App::getAppVersion('contacts');
 			$vCal->PRODID = '-//ownCloud//NONSGML '.$appInfo['name'].' '.$appVersion.'//EN';
