@@ -237,6 +237,68 @@ class Backend extends \Sabre\CardDAV\Backend\AbstractBackend {
 		$backend->createContact($id, $carddata, array('uri' => $carduri));
 	}
 
+	private function RepairCardData($cardData)
+	{
+		$arr = preg_split('/\n|\r\n?/', $cardData);
+	
+		$index = 0;
+		$tagPhoto = 'PHOTO';
+		$tagVersion = 'VERSION';
+		$tagPhotoLen = strlen($tagPhoto);
+		$tagVersionLen = strlen($tagVersion);
+		$version = '';
+		$versionIndex = 0;
+		$photoIndex = 0;
+		$photo = '';
+	
+		for($index = 0; $index < count($arr); $index++)
+		{
+			$v = $arr[$index];
+			#print $v . "\r\n";
+			if (substr($v, 0, $tagVersionLen) == $tagVersion)
+			{
+				$version = trim(substr($v, $tagVersionLen + 1));
+				#print " --> version: #" . $version . "#\r\n";
+	
+				$versionIndex = $index;
+				if ($photoIndex != 0)
+					break;
+			}
+			if (substr($v, 0, $tagPhotoLen) == $tagPhoto)
+			{
+				$photo = trim(substr($v, $tagPhotoLen + 1));
+				#print " --> photo: " . $photo . "\r\n";
+				$photoIndex = $index;
+				if ($versionIndex != 0)
+					break;
+			}
+		}
+		
+		if ($versionIndex != 0 && $photoIndex != 0)
+		{
+			#\OC::$server->getLogger()->debug('test regex' , [ 'app' => 'patch' ]);
+
+			if (preg_match('#data:image/([^;]+);base64,(.*)#i', $v, $matches))
+			{
+				#\OC::$server->getLogger()->debug('regex ok' , [ 'app' => 'patch' ]);
+
+				if ($version == '3.0')
+				{
+					#\OC::$server->getLogger()->debug('version mismatch' , [ 'app' => 'patch' ]);
+
+					// should be version 4.0, so convert
+					#$arr[$versionIndex] = $tagVersion . ':4.0'; -> not working, so convert PHOTO to v3.0
+					
+					#\OC::$server->getLogger()->debug('matches: ' . print_r($matches, true) , [ 'app' => 'patch' ]);
+					
+					$arr[$photoIndex] = $tagPhoto . ';TYPE=' . strtoupper($matches[1]) . ';VALUE=BINARY;ENCODING=B:' . $matches[2];
+				}
+			}
+		}
+	
+		return implode("\r\n", $arr);
+	}
+
 	/**
 	 * Updates a card
 	 *
@@ -246,6 +308,15 @@ class Backend extends \Sabre\CardDAV\Backend\AbstractBackend {
 	 * @return null
 	 */
 	public function updateCard($addressbookid, $carduri, $carddata) {
+
+		#\OC::$server->getLogger()->debug('updateCard: ' . $addressbookid . ", " . str_replace("\n", "\\n", substr($carddata,0, 400)), [ 'app' => 'patch' ]);
+
+		$carddata = $this->RepairCardData($carddata);
+
+		#\OC::$server->getLogger()->debug('updateCard 2: ' . $addressbookid . ", " . str_replace("\n", "\\n", substr($carddata,0, 400)), [ 'app' => 'patch' ]);
+
+		#throw new \Exception('prevent result while implementation is not complete');
+
 		list($id, $backend) = $this->getBackendForAddressBook($addressbookid);
 		$backend->updateContact($id, array('uri' => $carduri,), $carddata);
 	}
